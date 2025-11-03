@@ -5,11 +5,14 @@
 #pragma once
 
 #include <px4_ros2/components/mode.hpp>
+#include <px4_ros2/components/mode_executor.hpp>
 #include <px4_ros2/control/setpoint_types/goto.hpp>
 #include <px4_ros2/odometry/local_position.hpp>
 #include <px4_ros2/utils/geometry.hpp>
 
 #include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/empty.hpp>
+#include <px4_msgs/msg/vehicle_global_position.hpp>
 #include <Eigen/Core>
 
 using namespace px4_ros2::literals; // NOLINT
@@ -233,4 +236,162 @@ private:
     return (position_error_m.norm() < kPositionErrorThreshold) &&
            (_vehicle_local_position->velocityNed().norm() < kVelocityErrorThreshold);
   }
+};
+
+// Executor for managing arm, takeoff, and mode switching
+class SquareFlightExecutor : public px4_ros2::ModeExecutorBase
+{
+public:
+  explicit SquareFlightExecutor(
+    rclcpp::Node & node,
+    SquareFlightMode & owned_mode,
+    bool activate_immediately = true)
+  : ModeExecutorBase(
+      node,
+      px4_ros2::ModeExecutorBase::Settings{
+        activate_immediately ?
+          px4_ros2::ModeExecutorBase::Settings::Activation::ActivateImmediately :
+          px4_ros2::ModeExecutorBase::Settings::Activation::ActivateAlways
+      },
+      owned_mode,
+      getTopicNamespacePrefix(node)),
+    _node(node)
+  {
+    RCLCPP_INFO(_node.get_logger(), "SquareFlightExecutor constructor - topic namespace: %s",
+                getTopicNamespacePrefix(node).c_str());
+
+    // Get takeoff altitude parameter (relative altitude)
+    if (!node.has_parameter("takeoff_altitude")) {
+      node.declare_parameter<double>("takeoff_altitude", 151.0);
+    }
+    _takeoff_altitude_relative = static_cast<float>(node.get_parameter("takeoff_altitude").as_double());
+
+    // Subscribe to global position
+    std::string global_pos_topic = getTopicNamespacePrefix(node) + "fmu/out/vehicle_global_position";
+    _global_position_sub = _node.create_subscription<px4_msgs::msg::VehicleGlobalPosition>(
+      global_pos_topic, rclcpp::SensorDataQoS(),
+      [this](const px4_msgs::msg::VehicleGlobalPosition::SharedPtr msg) {
+        _current_altitude_amsl = msg->alt;
+        _global_position_received = true;
+      });
+
+    RCLCPP_INFO(_node.get_logger(), "SquareFlightExecutor constructor complete - relative altitude: %.1fm, activation: %s",
+                _takeoff_altitude_relative, activate_immediately ? "ActivateImmediately" : "ActivateAlways");
+  }
+
+  void onActivate() override
+  {
+    RCLCPP_INFO(_node.get_logger(), "SquareFlightExecutor activated, starting sequence...");
+    runState(State::WaitForArming, px4_ros2::Result::Success);
+  }
+
+  void onDeactivate(DeactivateReason reason) override
+  {
+    RCLCPP_INFO(_node.get_logger(), "SquareFlightExecutor deactivated");
+    _trigger_sub.reset();
+  }
+
+private:
+  enum class State
+  {
+    WaitForArming,
+    Arming,
+    TakingOff,
+    SwitchingToHold,
+    WaitingForTrigger,
+    RunningCustomMode
+  };
+
+  void runState(State state, px4_ros2::Result previous_result)
+  {
+    if (previous_result != px4_ros2::Result::Success) {
+      RCLCPP_ERROR(_node.get_logger(), "State failed: %s, aborting sequence",
+                   resultToString(previous_result));
+      return;
+    }
+
+    switch (state) {
+      case State::WaitForArming:
+        RCLCPP_INFO(_node.get_logger(), "Waiting until ready to arm...");
+        waitReadyToArm([this](px4_ros2::Result result) {
+          runState(State::Arming, result);
+        });
+        break;
+
+      case State::Arming:
+        RCLCPP_INFO(_node.get_logger(), "Arming...");
+        arm([this](px4_ros2::Result result) {
+          runState(State::TakingOff, result);
+        });
+        break;
+
+      case State::TakingOff: {
+        if (!_global_position_received) {
+          RCLCPP_WARN(_node.get_logger(), "Waiting for global position...");
+          // Retry after a short delay
+          std::this_thread::sleep_for(std::chrono::milliseconds(100));
+          runState(State::TakingOff, px4_ros2::Result::Success);
+          return;
+        }
+
+        float target_altitude_amsl = _current_altitude_amsl + _takeoff_altitude_relative;
+        RCLCPP_INFO(_node.get_logger(), "Taking off: current %.1fm AMSL + %.1fm relative = %.1fm AMSL",
+                    _current_altitude_amsl, _takeoff_altitude_relative, target_altitude_amsl);
+        takeoff([this](px4_ros2::Result result) {
+          runState(State::SwitchingToHold, result);
+        }, target_altitude_amsl);
+        break;
+      }
+
+      case State::SwitchingToHold: {
+        RCLCPP_INFO(_node.get_logger(), "Switching to HOLD mode...");
+        // Send HOLD command directly
+        auto result = sendCommandSync(
+          px4_msgs::msg::VehicleCommand::VEHICLE_CMD_SET_NAV_STATE,
+          4.0f,  // param1: 4 = HOLD
+          NAN, NAN, NAN, NAN, NAN, NAN);
+
+        RCLCPP_INFO(_node.get_logger(), "HOLD mode command result: %s", resultToString(result));
+        runState(State::WaitingForTrigger, result);
+        break;
+      }
+
+      case State::WaitingForTrigger:
+        RCLCPP_INFO(_node.get_logger(), "Hovering, waiting for mission trigger...");
+        // Subscribe to trigger topic
+        _trigger_sub = _node.create_subscription<std_msgs::msg::Empty>(
+          "/mission_trigger", 10,
+          [this](const std_msgs::msg::Empty::SharedPtr) {
+            RCLCPP_INFO(_node.get_logger(), "Trigger received! Starting custom mode...");
+            _trigger_sub.reset(); // Unsubscribe after receiving trigger
+            scheduleMode(
+              ownedMode().id(),
+              [this](px4_ros2::Result result) {
+                runState(State::RunningCustomMode, result);
+              });
+          });
+        break;
+
+      case State::RunningCustomMode:
+        RCLCPP_INFO(_node.get_logger(), "Custom square flight mode is now active");
+        // Mode will run until manually deactivated
+        break;
+    }
+  }
+
+  static std::string getTopicNamespacePrefix(rclcpp::Node & node)
+  {
+    if (!node.has_parameter("px4_sysid")) {
+      node.declare_parameter<int>("px4_sysid", 1);
+    }
+    int sysid = node.get_parameter("px4_sysid").as_int();
+    return "vehicle" + std::to_string(sysid) + "/";
+  }
+
+  rclcpp::Node & _node;
+  float _takeoff_altitude_relative;
+  float _current_altitude_amsl{0.0f};
+  bool _global_position_received{false};
+  rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr _trigger_sub;
+  rclcpp::Subscription<px4_msgs::msg::VehicleGlobalPosition>::SharedPtr _global_position_sub;
 };

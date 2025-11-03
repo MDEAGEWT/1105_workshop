@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(custom_flight)
+project(custom_line_flight)
 
 if(NOT CMAKE_CXX_STANDARD)
     set(CMAKE_CXX_STANDARD 17)
@@ -16,18 +16,17 @@ find_package(Eigen3 REQUIRED)
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(px4_ros2_cpp REQUIRED)
+find_package(std_msgs REQUIRED)
 
 include_directories(include ${Eigen3_INCLUDE_DIRS})
-add_executable(custom_square_flight
+add_executable(custom_line_flight
         src/main.cpp)
-target_link_libraries(custom_square_flight PUBLIC Eigen3::Eigen px4_ros2_cpp::px4_ros2_cpp rclcpp::rclcpp)
+target_link_libraries(custom_line_flight Eigen3::Eigen)
+ament_target_dependencies(custom_line_flight rclcpp px4_ros2_cpp std_msgs)
 
 install(TARGETS
-        custom_square_flight
+        custom_line_flight
         DESTINATION lib/${PROJECT_NAME})
-
-install(DIRECTORY launch
-        DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
     find_package(ament_lint_auto REQUIRED)
