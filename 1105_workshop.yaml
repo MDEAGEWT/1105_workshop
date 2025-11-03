@@ -1,0 +1,183 @@
+# example.yaml
+
+px4_target:
+# - A mapping of build targets identified by unique numeric keys.
+# - 0 must be a RealGazebo-PX4 build target.
+  0 : /home/user/realgazebo/RealGazebo-PX4
+  # 1 : /home/user/realgazebo/PX4Demo
+  # 1: /path/to/your/other/PX4-Autopilot
+
+vehicles:
+# - Each entity is identified by a unique numeric key (e.g., 0, 1, 2, 3).
+#  - 'type': Specifies the type of the entity.
+#  - 'build_target': References the PX4 target defined above, determining which PX4-Autopilot build to use.
+#  - 'spawnpoint' : Defines the spawn location in a 3D space using coordinates and a yaw value (in radians) (x, y, z, yaw).
+  0 :
+    type : rover_ackermann # urban rover 1
+    build_target : 0
+    spawnpoint : (-234.56, 115.33, 12.67, -2.98)
+
+  1 :
+    type : rover_ackermann # beltway rover 1
+    build_target : 0
+    spawnpoint : (-221.62, 126.20, 12.65, 1.639)
+
+  2 :
+    type : x500 # drone 1
+    build_target : 0
+    spawnpoint : (26.98, -16.14, -1.5, -3.14)
+
+  3 :
+    type : lc_62 # high uav 1
+    build_target : 0
+    spawnpoint : (-24.458, -12.013, 0.3, -3.14)
+
+  4 :
+    type : rover_ackermann # urban rover 2
+    build_target : 0
+    spawnpoint : (-232.57, 115.57, 12.7, -2.99)
+
+  5 :
+    type : rover_ackermann # urban rover 3
+    build_target : 0
+    spawnpoint : (-230.59, 115.82, 12.64, -3)
+
+  6 :
+    type : rover_ackermann # urban rover 4
+    build_target : 0
+    spawnpoint : (-228.6, 116.06, 12.68, -3)
+
+  7 :
+    type : rover_ackermann # beltway rover 2
+    build_target : 0
+    spawnpoint : (-221.62, 123.20, 12.65, 1.639)
+
+  8 :
+    type : rover_ackermann # beltway rover 3
+    build_target : 0
+    spawnpoint : (-221.62, 120.20, 12.65, 1.639)
+
+  9 :
+    type : rover_ackermann # beltway rover 4
+    build_target : 0
+    spawnpoint : (-221.62, 117.20, 12.65, 1.639)
+
+  10 :
+    type : x500 # drone 2
+    build_target : 0
+    spawnpoint : (26.98, -36.32, -0.3, -3.14)
+
+  11 :
+    type : x500 # drone 3
+    build_target : 0
+    spawnpoint : (26.98, -2.66, -1.6, -3.14)
+
+  12 :
+    type : x500 # drone 4
+    build_target : 0
+    spawnpoint : (26.98, 15.48, -1.4, -3.14)
+  
+## obstacles
+  13 :
+    type : rock
+    spawnpoint : (-264.51, 109.87, 13.37, -1.5)
+
+  14 :
+    type : rock
+    spawnpoint : (-277.37, 109.13, 13.57, 2.1)
+
+  15 :
+    type : rock
+    spawnpoint : (-286.57, 107.73, 13.57, -2.3)
+
+  16 :
+    type : rock
+    spawnpoint : (-294.76, 107.93, 13.77, 0.9)
+
+  17 :
+    type : rock
+    spawnpoint : (-301.46, 111.13, 13.77, -1.1)
+
+  18 :
+    type : rock
+    spawnpoint : (-303.16, 125.73, 14.17, 1.8)
+
+  19 :
+    type : rock
+    spawnpoint : (-309.96, 143.23, 14.17, -0.4)
+
+  20 :
+    type : rock
+    spawnpoint : (-321.66, 148.13, 14.37, 2.5)
+
+  21 :
+    type : rock
+    spawnpoint : (-347.06, 144.53, 14.90, -2.7)
+
+  22 :
+    type : rock
+    spawnpoint : (-363.56, 148.13, 14.77, 0.7)
+
+  23 :
+    type : rock
+    spawnpoint : (-365.13, 166.32, 14.77, -1.9)
+
+  24 :
+    type : rock
+    spawnpoint : (-368.05, 174.86, 14.77, 1.4)
+
+  25 :
+    type : rock
+    spawnpoint : (-367.80, 183.89, 14.77, -0.6)
+
+  26 :
+    type : rock
+    spawnpoint : (-370.73, 192.43, 14.77, 2.8)
+
+  27 :
+    type : rock
+    spawnpoint : (-370.48, 201.45, 14.77, -2.0)
+
+  28 :
+    type : rock
+    spawnpoint : (-373.40, 210.00, 14.88, 1.0)
+
+  29 :
+    type : rock
+    spawnpoint : (-371.26, 187.83, 14.77, -1.3)
+
+  30 :
+    type : rock
+    spawnpoint : (-259.76, 192.59, 13.67, -1.3)
+
+  31 :
+    type : rock
+    spawnpoint : (-257.99, 180.30, 13.72, -1.3)
+
+  32 :
+    type : rock
+    spawnpoint : (-256.23, 168.00, 13.72, -1.3)
+
+  33 :
+    type : rock
+    spawnpoint : (-254.46, 155.71, 13.00, -1.3)
+
+  34 :
+    type : rock
+    spawnpoint : (-252.69, 143.41, 13.3, -1.3)
+
+  35 :
+    type : rock
+    spawnpoint : (-250.92, 131.12, 13.00, -1.3)
+
+  36 :
+    type : rock
+    spawnpoint : (-247.60, 113.52, 13.17, 0.5)
+
+  37 :
+    type : rock
+    spawnpoint : (-251.64, 114.04, 13.17, -0.8)
+
+  38 :
+    type : rock
+    spawnpoint : (-257.86, 111.79, 13.37, 1.2)
